@@ -11,8 +11,20 @@ export const getUnderConstructionStatus = async (): Promise<boolean> => {
       .eq("key", UNDER_CONSTRUCTION_KEY)
       .single();
 
-    if (error && error.code !== "PGRST116") {
-      console.error("Error fetching under construction status:", error);
+    if (error) {
+      // PGRST116 is "not found" - table or row doesn't exist
+      if (error.code === "PGRST116") {
+        console.warn("Under construction setting not found, initializing...");
+        await initializeUnderConstructionSetting();
+        return true;
+      }
+      // Log the error details for debugging
+      console.error("Error fetching under construction status:", {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
       return true; // Default to under construction if there's an error
     }
 
@@ -24,7 +36,7 @@ export const getUnderConstructionStatus = async (): Promise<boolean> => {
 
     return data.value === true || data.value === "true";
   } catch (error) {
-    console.error("Error getting under construction status:", error);
+    console.error("Unexpected error getting under construction status:", error);
     return true; // Default to under construction if there's an error
   }
 };
@@ -43,13 +55,18 @@ export const setUnderConstructionStatus = async (
       .eq("key", UNDER_CONSTRUCTION_KEY);
 
     if (error) {
-      console.error("Error setting under construction status:", error);
+      console.error("Error setting under construction status:", {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
       return false;
     }
 
     return true;
   } catch (error) {
-    console.error("Error setting under construction status:", error);
+    console.error("Unexpected error setting under construction status:", error);
     return false;
   }
 };
