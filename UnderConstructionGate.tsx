@@ -1,30 +1,23 @@
 import React, { useState, useEffect } from "react";
 import UnderConstruction from "@/components/UnderConstruction";
 
-const STORAGE_KEY = "site_access_granted";
-
 export default function UnderConstructionGate({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [hasAccess, setHasAccess] = useState<boolean | null>(null);
+  const [hasAccess, setHasAccess] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const storedAccess = localStorage.getItem(STORAGE_KEY);
-    if (storedAccess === "true") {
-      setHasAccess(true);
-    } else {
-      setHasAccess(false);
-    }
+    setIsLoading(false);
   }, []);
 
   const handleAccessGranted = () => {
-    localStorage.setItem(STORAGE_KEY, "true");
     setHasAccess(true);
   };
 
-  if (hasAccess === null) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gaming-dark flex items-center justify-center text-neon-blue">
         Loading...
