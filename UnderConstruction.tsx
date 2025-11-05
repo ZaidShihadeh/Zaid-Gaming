@@ -162,12 +162,6 @@ export default function UnderConstruction({
               </Button>
             </form>
 
-            {/* Footer */}
-            <div className="text-center pt-4 border-t border-gaming-border">
-              <p className="text-xs text-muted-foreground">
-                🎮 Zaid Gaming
-              </p>
-            </div>
           </CardContent>
         </Card>
 
