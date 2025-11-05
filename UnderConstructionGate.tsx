@@ -1,20 +1,32 @@
 import React, { useState, useEffect } from "react";
 import UnderConstruction from "@/components/UnderConstruction";
+import { getUnderConstructionStatus } from "@/lib/under-construction-utils";
 
 export default function UnderConstructionGate({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [hasAccess, setHasAccess] = useState(false);
+  const [isUnderConstruction, setIsUnderConstruction] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasLocalAccess, setHasLocalAccess] = useState(false);
 
   useEffect(() => {
-    setIsLoading(false);
+    const checkStatus = async () => {
+      const underConstruction = await getUnderConstructionStatus();
+      setIsUnderConstruction(underConstruction);
+      setIsLoading(false);
+    };
+
+    checkStatus();
+
+    // Poll for changes every 5 seconds
+    const interval = setInterval(checkStatus, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleAccessGranted = () => {
-    setHasAccess(true);
+    setHasLocalAccess(true);
   };
 
   if (isLoading) {
@@ -25,7 +37,7 @@ export default function UnderConstructionGate({
     );
   }
 
-  if (!hasAccess) {
+  if (isUnderConstruction && !hasLocalAccess) {
     return <UnderConstruction onAccessGranted={handleAccessGranted} />;
   }
 
