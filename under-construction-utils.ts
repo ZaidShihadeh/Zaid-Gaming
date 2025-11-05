@@ -2,6 +2,7 @@ import { supabase } from "@/supabase";
 
 const SETTINGS_TABLE = "app_settings";
 const UNDER_CONSTRUCTION_KEY = "under_construction_enabled";
+const FALLBACK_STORAGE_KEY = "under_construction_status_fallback";
 
 export const getUnderConstructionStatus = async (): Promise<boolean> => {
   try {
@@ -14,9 +15,12 @@ export const getUnderConstructionStatus = async (): Promise<boolean> => {
     if (error) {
       // PGRST116 is "not found" - table or row doesn't exist
       if (error.code === "PGRST116") {
-        console.warn("Under construction setting not found, initializing...");
-        await initializeUnderConstructionSetting();
-        return true;
+        console.warn("Under construction table not found, using fallback storage");
+        const fallbackValue = localStorage.getItem(FALLBACK_STORAGE_KEY);
+        if (fallbackValue !== null) {
+          return fallbackValue === "true";
+        }
+        return true; // Default to under construction
       }
       // Log the error details for debugging
       console.error("Error fetching under construction status:", {
@@ -25,19 +29,26 @@ export const getUnderConstructionStatus = async (): Promise<boolean> => {
         details: error.details,
         hint: error.hint,
       });
-      return true; // Default to under construction if there's an error
+      // Use fallback storage on error
+      const fallbackValue = localStorage.getItem(FALLBACK_STORAGE_KEY);
+      return fallbackValue === null ? true : fallbackValue === "true";
     }
 
     if (!data) {
-      // Initialize the setting if it doesn't exist
+      // No data found, try to initialize
       await initializeUnderConstructionSetting();
       return true;
     }
 
-    return data.value === true || data.value === "true";
+    const status = data.value === true || data.value === "true";
+    // Keep fallback in sync
+    localStorage.setItem(FALLBACK_STORAGE_KEY, String(status));
+    return status;
   } catch (error) {
     console.error("Unexpected error getting under construction status:", error);
-    return true; // Default to under construction if there's an error
+    // Use fallback on any error
+    const fallbackValue = localStorage.getItem(FALLBACK_STORAGE_KEY);
+    return fallbackValue === null ? true : fallbackValue === "true";
   }
 };
 
@@ -61,13 +72,21 @@ export const setUnderConstructionStatus = async (
         details: error.details,
         hint: error.hint,
       });
-      return false;
+      // If database fails, use fallback
+      console.warn("Database unavailable, using fallback storage");
+      localStorage.setItem(FALLBACK_STORAGE_KEY, String(enabled));
+      return true;
     }
 
+    // Keep fallback in sync
+    localStorage.setItem(FALLBACK_STORAGE_KEY, String(enabled));
     return true;
   } catch (error) {
     console.error("Unexpected error setting under construction status:", error);
-    return false;
+    // Use fallback on any error
+    console.warn("Using fallback storage due to error");
+    localStorage.setItem(FALLBACK_STORAGE_KEY, String(enabled));
+    return true;
   }
 };
 
