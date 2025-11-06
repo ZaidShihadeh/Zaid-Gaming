@@ -20,7 +20,7 @@ export const getUnderConstructionStatus = async (): Promise<boolean> => {
         if (fallbackValue !== null) {
           return fallbackValue === "true";
         }
-        return true; // Default to under construction
+        return false; // Default to under construction disabled
       }
       // Log the error details for debugging
       console.error("Error fetching under construction status:", {
@@ -31,13 +31,13 @@ export const getUnderConstructionStatus = async (): Promise<boolean> => {
       });
       // Use fallback storage on error
       const fallbackValue = localStorage.getItem(FALLBACK_STORAGE_KEY);
-      return fallbackValue === null ? true : fallbackValue === "true";
+      return fallbackValue === null ? false : fallbackValue === "true";
     }
 
     if (!data) {
       // No data found, try to initialize
       await initializeUnderConstructionSetting();
-      return true;
+      return false;
     }
 
     const status = data.value === true || data.value === "true";
@@ -48,7 +48,7 @@ export const getUnderConstructionStatus = async (): Promise<boolean> => {
     console.error("Unexpected error getting under construction status:", error);
     // Use fallback on any error
     const fallbackValue = localStorage.getItem(FALLBACK_STORAGE_KEY);
-    return fallbackValue === null ? true : fallbackValue === "true";
+    return fallbackValue === null ? false : fallbackValue === "true";
   }
 };
 
@@ -94,7 +94,7 @@ const initializeUnderConstructionSetting = async (): Promise<void> => {
   try {
     await supabase.from(SETTINGS_TABLE).insert({
       key: UNDER_CONSTRUCTION_KEY,
-      value: true,
+      value: false,
       updated_at: new Date().toISOString(),
     });
   } catch (error) {

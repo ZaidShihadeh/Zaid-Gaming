@@ -13,7 +13,7 @@ export default function Admin() {
   const authed = isAuthenticated();
   const user = getUserData();
   const isAdmin = !!user?.isAdmin;
-  const [isUnderConstruction, setIsUnderConstruction] = useState(true);
+  const [isUnderConstruction, setIsUnderConstruction] = useState(false);
   const [isTogglingStatus, setIsTogglingStatus] = useState(false);
   const [isLoadingStatus, setIsLoadingStatus] = useState(true);
 
