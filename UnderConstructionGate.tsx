@@ -9,7 +9,6 @@ export default function UnderConstructionGate({
   children: React.ReactNode;
 }) {
   const [isUnderConstruction, setIsUnderConstruction] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [hasLocalAccess, setHasLocalAccess] = useState(false);
   const [userAuthenticated, setUserAuthenticated] = useState(false);
 
@@ -33,8 +32,6 @@ export default function UnderConstructionGate({
         // On error, assume not under construction
         setIsUnderConstruction(false);
         setUserAuthenticated(isAuthenticated());
-      } finally {
-        setIsLoading(false);
       }
     };
 
@@ -49,14 +46,7 @@ export default function UnderConstructionGate({
     setHasLocalAccess(true);
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gaming-dark flex items-center justify-center text-neon-blue">
-        Loading...
-      </div>
-    );
-  }
-
+  // Show content immediately by default, only show under construction if explicitly enabled
   if (isUnderConstruction && !hasLocalAccess && !userAuthenticated) {
     return <UnderConstruction onAccessGranted={handleAccessGranted} />;
   }
