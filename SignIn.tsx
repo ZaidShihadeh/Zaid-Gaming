@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Card,
   CardContent,
@@ -20,6 +21,7 @@ import { DiscordIcon } from "@/components/DiscordIcon";
 export default function SignIn() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [keepSignedIn, setKeepSignedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [kickReason, setKickReason] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -53,7 +55,7 @@ export default function SignIn() {
 
       if (data.success) {
         if (data.token) {
-          setAuthData(data.token, data.user);
+          setAuthData(data.token, data.user, keepSignedIn);
 
           toast({
             title: "Success!",
@@ -203,6 +205,21 @@ export default function SignIn() {
                     required
                   />
                 </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="keep-signed-in"
+                  checked={keepSignedIn}
+                  onCheckedChange={(checked) =>
+                    setKeepSignedIn(checked === true)
+                  }
+                />
+                <Label
+                  htmlFor="keep-signed-in"
+                  className="text-sm font-normal cursor-pointer"
+                >
+                  Keep me signed in
+                </Label>
               </div>
               <Button
                 type="submit"
