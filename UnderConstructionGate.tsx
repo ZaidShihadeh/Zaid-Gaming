@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import UnderConstruction from "@/components/UnderConstruction";
 import { getUnderConstructionStatus } from "@/lib/under-construction-utils";
+import { isAuthenticated } from "@/lib/auth-utils";
 
 export default function UnderConstructionGate({
   children,
@@ -10,11 +11,13 @@ export default function UnderConstructionGate({
   const [isUnderConstruction, setIsUnderConstruction] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [hasLocalAccess, setHasLocalAccess] = useState(false);
+  const [userAuthenticated, setUserAuthenticated] = useState(false);
 
   useEffect(() => {
     const checkStatus = async () => {
       const underConstruction = await getUnderConstructionStatus();
       setIsUnderConstruction(underConstruction);
+      setUserAuthenticated(isAuthenticated());
       setIsLoading(false);
     };
 
@@ -37,7 +40,7 @@ export default function UnderConstructionGate({
     );
   }
 
-  if (isUnderConstruction && !hasLocalAccess) {
+  if (isUnderConstruction && !hasLocalAccess && !userAuthenticated) {
     return <UnderConstruction onAccessGranted={handleAccessGranted} />;
   }
 
