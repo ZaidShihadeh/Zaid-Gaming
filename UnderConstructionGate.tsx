@@ -9,16 +9,30 @@ export default function UnderConstructionGate({
   children: React.ReactNode;
 }) {
   const [isUnderConstruction, setIsUnderConstruction] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [hasLocalAccess, setHasLocalAccess] = useState(false);
   const [userAuthenticated, setUserAuthenticated] = useState(false);
 
   useEffect(() => {
     const checkStatus = async () => {
-      const underConstruction = await getUnderConstructionStatus();
-      setIsUnderConstruction(underConstruction);
-      setUserAuthenticated(isAuthenticated());
-      setIsLoading(false);
+      try {
+        // Add timeout to prevent hanging
+        const timeoutPromise = new Promise<boolean>((resolve) => {
+          setTimeout(() => resolve(false), 5000); // 5 second timeout
+        });
+
+        const underConstruction = await Promise.race([
+          getUnderConstructionStatus(),
+          timeoutPromise,
+        ]);
+
+        setIsUnderConstruction(underConstruction);
+        setUserAuthenticated(isAuthenticated());
+      } catch (error) {
+        console.error("Error checking under construction status:", error);
+        // On error, assume not under construction
+        setIsUnderConstruction(false);
+        setUserAuthenticated(isAuthenticated());
+      }
     };
 
     checkStatus();
@@ -32,14 +46,7 @@ export default function UnderConstructionGate({
     setHasLocalAccess(true);
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gaming-dark flex items-center justify-center text-neon-blue">
-        Loading...
-      </div>
-    );
-  }
-
+  // Show content immediately by default, only show under construction if explicitly enabled
   if (isUnderConstruction && !hasLocalAccess && !userAuthenticated) {
     return <UnderConstruction onAccessGranted={handleAccessGranted} />;
   }
