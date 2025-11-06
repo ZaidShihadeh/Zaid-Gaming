@@ -15,10 +15,27 @@ export default function UnderConstructionGate({
 
   useEffect(() => {
     const checkStatus = async () => {
-      const underConstruction = await getUnderConstructionStatus();
-      setIsUnderConstruction(underConstruction);
-      setUserAuthenticated(isAuthenticated());
-      setIsLoading(false);
+      try {
+        // Add timeout to prevent hanging
+        const timeoutPromise = new Promise<boolean>((resolve) => {
+          setTimeout(() => resolve(false), 5000); // 5 second timeout
+        });
+
+        const underConstruction = await Promise.race([
+          getUnderConstructionStatus(),
+          timeoutPromise,
+        ]);
+
+        setIsUnderConstruction(underConstruction);
+        setUserAuthenticated(isAuthenticated());
+      } catch (error) {
+        console.error("Error checking under construction status:", error);
+        // On error, assume not under construction
+        setIsUnderConstruction(false);
+        setUserAuthenticated(isAuthenticated());
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     checkStatus();
