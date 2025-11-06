@@ -8,7 +8,7 @@ export default function UnderConstructionGate({
 }: {
   children: React.ReactNode;
 }) {
-  const [isUnderConstruction, setIsUnderConstruction] = useState(true);
+  const [isUnderConstruction, setIsUnderConstruction] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [hasLocalAccess, setHasLocalAccess] = useState(false);
   const [userAuthenticated, setUserAuthenticated] = useState(false);
