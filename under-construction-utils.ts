@@ -4,8 +4,26 @@ const SETTINGS_TABLE = "app_settings";
 const UNDER_CONSTRUCTION_KEY = "under_construction_enabled";
 const FALLBACK_STORAGE_KEY = "under_construction_status_fallback";
 
+let lastErrorLogTime = 0;
+const ERROR_LOG_DEBOUNCE_MS = 10000; // Only log errors once per 10 seconds
+
+const shouldLogError = (): boolean => {
+  const now = Date.now();
+  if (now - lastErrorLogTime > ERROR_LOG_DEBOUNCE_MS) {
+    lastErrorLogTime = now;
+    return true;
+  }
+  return false;
+};
+
 export const getUnderConstructionStatus = async (): Promise<boolean> => {
   try {
+    // Skip if Supabase is not configured
+    if (!import.meta.env.VITE_SUPABASE_URL) {
+      const fallbackValue = localStorage.getItem(FALLBACK_STORAGE_KEY);
+      return fallbackValue === null ? false : fallbackValue === "true";
+    }
+
     const { data, error } = await supabase
       .from(SETTINGS_TABLE)
       .select("value")
@@ -15,20 +33,24 @@ export const getUnderConstructionStatus = async (): Promise<boolean> => {
     if (error) {
       // PGRST116 is "not found" - table or row doesn't exist
       if (error.code === "PGRST116") {
-        console.warn("Under construction table not found, using fallback storage");
+        if (shouldLogError()) {
+          console.warn(
+            "Under construction table not found, using fallback storage"
+          );
+        }
         const fallbackValue = localStorage.getItem(FALLBACK_STORAGE_KEY);
         if (fallbackValue !== null) {
           return fallbackValue === "true";
         }
-        return false; // Default to under construction disabled
+        return false;
       }
-      // Log the error details for debugging
-      console.error("Error fetching under construction status:", {
-        code: error.code,
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-      });
+      // Log the error details for debugging (debounced)
+      if (shouldLogError()) {
+        console.error("Error fetching under construction status:", {
+          code: error.code,
+          message: error.message,
+        });
+      }
       // Use fallback storage on error
       const fallbackValue = localStorage.getItem(FALLBACK_STORAGE_KEY);
       return fallbackValue === null ? false : fallbackValue === "true";
@@ -45,7 +67,9 @@ export const getUnderConstructionStatus = async (): Promise<boolean> => {
     localStorage.setItem(FALLBACK_STORAGE_KEY, String(status));
     return status;
   } catch (error) {
-    console.error("Unexpected error getting under construction status:", error);
+    if (shouldLogError()) {
+      console.error("Unexpected error getting under construction status:", error);
+    }
     // Use fallback on any error
     const fallbackValue = localStorage.getItem(FALLBACK_STORAGE_KEY);
     return fallbackValue === null ? false : fallbackValue === "true";
