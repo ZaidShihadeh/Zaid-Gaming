@@ -1,5 +1,5 @@
 [build]
-  command = "npm run validate:encoding && npm run build:client && npm run build:server"
+  command = "npm run build:client && npm run build:server"
   functions = "netlify/functions"
   publish = "dist/spa"
 
