@@ -18,7 +18,8 @@
     "start": "node dist/server/node-build.mjs",
     "test": "vitest --run",
     "format.fix": "prettier --write .",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "validate:encoding": "node ../Ayah-Quran-Tutor/scripts/validate-encoding.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.53.0",
