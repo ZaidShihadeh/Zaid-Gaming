@@ -19,7 +19,7 @@
     "test": "vitest --run",
     "format.fix": "prettier --write .",
     "typecheck": "tsc",
-    "validate:encoding": "node ../Ayah-Quran-Tutor/scripts/validate-encoding.js"
+    "validate:encoding": "cd .. && node Ayah-Quran-Tutor/scripts/validate-encoding.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.53.0",
