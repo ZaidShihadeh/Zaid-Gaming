@@ -25,19 +25,40 @@ import type {
 import type { CreateReportRequest } from "../reports";
 import type { CreateGameSuggestionRequest } from "../game-suggestions";
 
-// Simple in-memory stores (ephemeral, dev-only)
-const db = {
-  users: new Map<string, User & { passwordHash?: string }>(),
-  events: new Map<string, EventItem>(),
-  eventRsvps: new Map<string, Set<string>>(), // eventId -> Set<userId>
-  notifications: new Map<string, NotificationItem[]>(), // userId -> notifications
-  media: new Map<string, MediaItem>(),
-  comments: new Map<string, CommentItem[]>(), // mediaId -> comments
-  reports: new Map<string, any>(), // reportId -> report
-  contacts: new Map<string, any[]>(), // userId -> contact messages
-  gameSuggestions: new Map<string, any>(), // suggestionId -> game suggestion
-  pendingMedia: new Set<string>(), // ids of pending media
-};
+// Supabase database client
+import {
+  initializeDatabase,
+  getUserByEmail,
+  getUserById,
+  getAllUsers,
+  createUser,
+  updateUser,
+  deleteUser,
+  getApprovedMedia,
+  getPendingMedia,
+  createMedia,
+  updateMediaStatus,
+  getComments,
+  createComment,
+  getAllEvents,
+  createEvent,
+  getEventRsvp,
+  getEventRsvpCount,
+  toggleEventRsvp,
+  getNotifications,
+  getAllReports,
+  getUserReports,
+  createReport,
+  updateReport,
+  getAllContacts,
+  getUserContacts,
+  createContact,
+  updateContact,
+  getAllGameSuggestions,
+  getUserGameSuggestions,
+  createGameSuggestion,
+  updateGameSuggestion,
+} from "./supabase-db";
 
 // Validation schemas
 const signUpSchema = z.object({
@@ -216,11 +237,8 @@ function isAdminByIdentity(
   );
 }
 
-function findUserByEmail(email: string) {
-  email = email.toLowerCase();
-  return Array.from(db.users.values()).find(
-    (u) => u.email?.toLowerCase?.() === email,
-  );
+async function findUserByEmailAsync(email: string) {
+  return await getUserByEmail(email);
 }
 
 export function createServer() {
@@ -243,23 +261,26 @@ export function createServer() {
     legacyHeaders: false,
   });
 
-  // Seed a deterministic Test Account (with test status) in demo mode only
-  if (DEMO_MODE) {
-    const existingTest = findUserByEmail(TEST_EMAIL);
-    if (!existingTest) {
-      const id = uid("user");
-      // Use plaintext for demo-only test account
-      db.users.set(id, {
-        id,
-        email: TEST_EMAIL,
-        name: "Test Account",
-        isAdmin: false,
-        status: "test",
-        isBanned: false,
-        createdAt: new Date().toISOString(),
-      } as any);
+  // Initialize Supabase and seed test account
+  (async () => {
+    await initializeDatabase();
+
+    if (DEMO_MODE) {
+      const existingTest = await findUserByEmailAsync(TEST_EMAIL);
+      if (!existingTest) {
+        const id = uid("user");
+        await createUser({
+          id,
+          email: TEST_EMAIL,
+          name: "Test Account",
+          is_admin: false,
+          status: "test",
+          is_banned: false,
+          created_at: new Date().toISOString(),
+        });
+      }
     }
-  }
+  })();
 
   // Middleware
   app.use(cors({
