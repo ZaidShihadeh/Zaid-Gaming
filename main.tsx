@@ -34,6 +34,7 @@ const GamePage = lazy(() => import("./GamePage"));
 const GameSuggestions = lazy(() => import("./GameSuggestions"));
 const GameTracking = lazy(() => import("./GameTracking"));
 const GameSuggestionsAdmin = lazy(() => import("./GameSuggestionsAdmin"));
+const TestPage = lazy(() => import("./TestPage"));
 
 const queryClient = new QueryClient();
 
@@ -84,6 +85,7 @@ const App = () => {
                 <Route path="/game-suggestions" element={<GameSuggestions />} />
                 <Route path="/game-tracking" element={<GameTracking />} />
                 <Route path="/game-suggestions-admin" element={<GameSuggestionsAdmin />} />
+                <Route path="/test" element={<TestPage />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

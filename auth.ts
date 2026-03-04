@@ -16,6 +16,8 @@ export interface User {
   badges?: string[];
   discordRoles?: string[];
   xp?: number;
+  status: "admin" | "test" | "regular";
+  password?: string; // Only returned to admin when viewing user details
 }
 
 export interface AuthState {
@@ -78,7 +80,8 @@ export interface UsersListResponse {
 
 export interface UserActionRequest {
   userId: string;
-  action: "ban" | "unban" | "kick" | "tempban";
+  action: "ban" | "unban" | "kick" | "tempban" | "change-status";
   duration?: number; // in hours for tempban
   reason?: string; // for kick reason
+  newStatus?: "admin" | "test" | "regular"; // for change-status action
 }

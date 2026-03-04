@@ -103,9 +103,10 @@ export default function Users() {
 
   const handleUserAction = async (
     userId: string,
-    action: "ban" | "unban" | "kick" | "tempban",
+    action: "ban" | "unban" | "kick" | "tempban" | "change-status",
     duration?: number,
     reason?: string,
+    newStatus?: "admin" | "test" | "regular",
   ) => {
     setActionLoading(userId);
 
@@ -115,6 +116,7 @@ export default function Users() {
         action,
         duration,
         reason,
+        newStatus,
       };
       const response = await fetch("/api/users/action", {
         method: "POST",
@@ -208,8 +210,9 @@ export default function Users() {
                   <TableRow className="border-gaming-border hover:bg-gaming-dark/50">
                     <TableHead>User</TableHead>
                     <TableHead>Email</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Role</TableHead>
+                    <TableHead>Ban Status</TableHead>
+                    <TableHead>User Status</TableHead>
+                    <TableHead>Password</TableHead>
                     <TableHead>Joined</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -263,26 +266,108 @@ export default function Users() {
                         )}
                       </TableCell>
                       <TableCell>
-                        {user.isAdmin ? (
+                        {user.status === "admin" ? (
                           <Badge className="bg-neon-purple/20 text-neon-purple border-neon-purple/30">
                             <Shield className="mr-1 h-3 w-3" />
                             Admin
+                          </Badge>
+                        ) : user.status === "test" ? (
+                          <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">
+                            Test
                           </Badge>
                         ) : (
                           <Badge
                             variant="outline"
                             className="text-muted-foreground border-gaming-border"
                           >
-                            User
+                            Regular
                           </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {user.password ? (
+                          <span className="text-yellow-400 text-xs font-mono">
+                            {user.password}
+                          </span>
+                        ) : (
+                          <span className="text-gray-500">—</span>
                         )}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {new Date(user.createdAt).toLocaleDateString()}
                       </TableCell>
                       <TableCell className="text-right">
+                        <div className="flex justify-end space-x-1 flex-wrap gap-2">
+                          {/* Status Change Button */}
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-cyan-400 border-cyan-500/50 hover:bg-cyan-500/10"
+                                title="Change user status"
+                              >
+                                <Shield className="h-4 w-4" />
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="bg-gaming-card border-gaming-border">
+                              <DialogHeader>
+                                <DialogTitle className="text-cyan-400">
+                                  Change User Status
+                                </DialogTitle>
+                                <DialogDescription>
+                                  Change status for{" "}
+                                  <span className="font-medium text-cyan-400">
+                                    {user.name}
+                                  </span>
+                                </DialogDescription>
+                              </DialogHeader>
+                              <div className="py-4 space-y-3">
+                                {(["admin", "test", "regular"] as const).map(
+                                  (statusOption) => (
+                                    <Button
+                                      key={statusOption}
+                                      onClick={() =>
+                                        handleUserAction(
+                                          user.id,
+                                          "change-status",
+                                          undefined,
+                                          undefined,
+                                          statusOption
+                                        )
+                                      }
+                                      variant={
+                                        user.status === statusOption
+                                          ? "default"
+                                          : "outline"
+                                      }
+                                      disabled={
+                                        actionLoading === user.id ||
+                                        user.status === statusOption
+                                      }
+                                      className={
+                                        statusOption === "admin"
+                                          ? "bg-neon-purple/20 text-neon-purple border-neon-purple/30 hover:bg-neon-purple/30 w-full"
+                                          : statusOption === "test"
+                                            ? "bg-blue-500/20 text-blue-400 border-blue-500/30 hover:bg-blue-500/30 w-full"
+                                            : "bg-gray-500/20 text-gray-400 border-gray-500/30 hover:bg-gray-500/30 w-full"
+                                      }
+                                    >
+                                      {statusOption === "admin" && (
+                                        <Shield className="mr-2 h-4 w-4" />
+                                      )}
+                                      {statusOption.charAt(0).toUpperCase() +
+                                        statusOption.slice(1)}{" "}
+                                      {user.status === statusOption && "✓"}
+                                    </Button>
+                                  )
+                                )}
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+
                         {user.id !== currentUser?.id && !user.isAdmin && (
-                          <div className="flex justify-end space-x-1">
+                          <>
                             {user.isBanned ||
                             (user.tempBannedUntil &&
                               new Date(user.tempBannedUntil) > new Date()) ? (
@@ -497,8 +582,9 @@ export default function Users() {
                                 </Dialog>
                               </>
                             )}
-                          </div>
+                          </>
                         )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

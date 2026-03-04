@@ -115,9 +115,10 @@ const updateGameSuggestionSchema = z.object({
 
 const usersActionSchema = z.object({
   userId: z.string(),
-  action: z.enum(["ban", "unban", "kick", "tempban"]),
+  action: z.enum(["ban", "unban", "kick", "tempban", "change-status"]),
   duration: z.number().positive().optional(),
   reason: z.string().max(500).optional(),
+  newStatus: z.enum(["admin", "test", "regular"]).optional(),
 });
 
 // Validation middleware
@@ -242,7 +243,7 @@ export function createServer() {
     legacyHeaders: false,
   });
 
-  // Seed a deterministic Test Account (non-admin) in demo mode only
+  // Seed a deterministic Test Account (with test status) in demo mode only
   if (DEMO_MODE) {
     const existingTest = findUserByEmail(TEST_EMAIL);
     if (!existingTest) {
@@ -253,6 +254,7 @@ export function createServer() {
         email: TEST_EMAIL,
         name: "Test Account",
         isAdmin: false,
+        status: "test",
         isBanned: false,
         createdAt: new Date().toISOString(),
       } as any);
@@ -337,11 +339,13 @@ export function createServer() {
     try {
       const id = uid("user");
       const hashedPassword = await bcryptjs.hash(body.password, 10);
+      const isAdmin = isAdminByIdentity({ email: body.email }) || false;
       const user: User & { passwordHash?: string } = {
         id,
         email: body.email,
         name: body.name,
-        isAdmin: isAdminByIdentity({ email: body.email }) || false,
+        isAdmin: isAdmin,
+        status: isAdmin ? "admin" : "regular",
         isBanned: false,
         createdAt: new Date().toISOString(),
         profilePicture: undefined,
@@ -403,11 +407,13 @@ export function createServer() {
           // In demo mode, auto-register new users
           const id = uid("user");
           const hashedPassword = await bcryptjs.hash(body.password, 10);
+          const isAdmin = isAdminByIdentity({ email: body.email }) || false;
           const newUser = {
             id,
             email: body.email,
             name: body.email.split("@")[0],
-            isAdmin: isAdminByIdentity({ email: body.email }) || false,
+            isAdmin: isAdmin,
+            status: isAdmin ? "admin" : "regular",
             isBanned: false,
             createdAt: new Date().toISOString(),
             passwordHash: hashedPassword,
@@ -481,12 +487,14 @@ export function createServer() {
     const userId = typeof id === "string" ? id : uid("user");
     let user = db.users.get(userId);
     if (!user) {
+      const isAdmin = isAdminByIdentity({ email, username });
       const newUser = {
         id: userId,
         email: email || `${username || name || "user"}@example.com`,
         name: name || username || "User",
         profilePicture,
-        isAdmin: isAdminByIdentity({ email, username }),
+        isAdmin: isAdmin,
+        status: isAdmin ? "admin" : "regular",
         isBanned: false,
         createdAt: new Date().toISOString(),
         discordId,
@@ -951,9 +959,11 @@ export function createServer() {
       name: u.name,
       profilePicture: u.profilePicture,
       isAdmin: u.isAdmin,
+      status: (u as any).status || "regular",
       isBanned: u.isBanned,
       tempBannedUntil: (u as any).tempBannedUntil,
       createdAt: u.createdAt,
+      password: (u as any).passwordHash ? "[HASHED]" : undefined, // Show hashed indicator for admin
     }));
     res.json({ success: true, users });
   });
@@ -965,7 +975,7 @@ export function createServer() {
     validateRequest(usersActionSchema),
     (req, res) => {
       const body = req.body as any;
-      const { userId, action, duration, reason } = body;
+      const { userId, action, duration, reason, newStatus } = body;
 
       const user = db.users.get(userId);
       if (!user) {
@@ -1015,6 +1025,15 @@ export function createServer() {
         const until = new Date(Date.now() + duration * 60 * 60 * 1000);
         (user as any).tempBannedUntil = until.toISOString();
         res.json({ success: true, message: "User temporarily banned" });
+      } else if (action === "change-status") {
+        if (!newStatus || !["admin", "test", "regular"].includes(newStatus)) {
+          return res.status(400).json({
+            success: false,
+            message: "Valid status required (admin, test, regular)",
+          });
+        }
+        (user as any).status = newStatus;
+        res.json({ success: true, message: `User status changed to ${newStatus}` });
       } else {
         res.status(400).json({ success: false, message: "Invalid action" });
       }
