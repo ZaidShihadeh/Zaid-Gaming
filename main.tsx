@@ -9,6 +9,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { preserveAuthState } from "@/lib/auth-utils";
 import UnderConstructionGate from "@/components/UnderConstructionGate";
+import AuthGate from "@/components/AuthGate";
 // Route-based code splitting
 const Index = lazy(() => import("./Index"));
 const NotFound = lazy(() => import("./NotFound"));

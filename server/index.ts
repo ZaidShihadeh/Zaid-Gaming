@@ -142,6 +142,13 @@ const usersActionSchema = z.object({
   newStatus: z.enum(["admin", "test", "regular"]).optional(),
 });
 
+const adminCreateUserSchema = z.object({
+  email: z.string().email("Invalid email").max(255),
+  name: z.string().min(1, "Name is required").max(255),
+  password: z.string().min(8, "Password must be at least 8 characters").max(128),
+  status: z.enum(["admin", "test", "regular"]).optional(),
+});
+
 // Validation middleware
 function validateRequest<T>(schema: z.ZodSchema<T>) {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -370,54 +377,13 @@ export function createServer() {
     res.json({ success: true, user: userResponse });
   });
 
-  app.post(
-    "/api/auth/signup",
-    signupLimiter,
-    validateRequest(signUpSchema),
-    async (req, res) => {
-      const body = req.body as SignUpRequest;
-
-      try {
-        // Check if email already exists
-        const existingUser = await findUserByEmailAsync(body.email);
-        if (existingUser)
-          return res.json({ success: false, message: "Email already registered" });
-
-        const id = uid("user");
-        const hashedPassword = await bcryptjs.hash(body.password, 10);
-        const isAdmin = isAdminByIdentity({ email: body.email }) || false;
-
-        const user = await createUser({
-          id,
-          email: body.email,
-          name: body.name,
-          is_admin: isAdmin,
-          status: isAdmin ? "admin" : "regular",
-          is_banned: false,
-          password_hash: hashedPassword,
-          created_at: new Date().toISOString(),
-        });
-
-        if (!user) {
-          return res.status(500).json({ success: false, message: "Failed to create user" });
-        }
-
-        const token = issueToken(id);
-        res.cookie("auth_token", token, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
-          maxAge: 30 * 24 * 60 * 60 * 1000,
-          path: "/",
-        });
-
-        res.json({ success: true, user: convertDbUserToApi(user) });
-      } catch (error) {
-        console.error("[Auth] Signup error:", error);
-        res.status(500).json({ success: false, message: "Signup failed" });
-      }
-    }
-  );
+  // Signup endpoint disabled - only admins can create users
+  app.post("/api/auth/signup", (_req, res) => {
+    res.status(403).json({
+      success: false,
+      message: "Sign up is disabled. Ask an administrator to create an account for you.",
+    });
+  });
 
   app.post(
     "/api/auth/signin",
@@ -1085,6 +1051,54 @@ export function createServer() {
       } catch (error) {
         console.error("[Users] Action error:", error);
         res.status(500).json({ success: false, message: "Failed to perform action" });
+      }
+    }
+  );
+
+  // Admin: Create a new user
+  app.post(
+    "/api/users/create",
+    authMiddleware,
+    adminMiddleware,
+    validateRequest(adminCreateUserSchema),
+    async (req, res) => {
+      try {
+        const body = req.body as any;
+        const { email, name, password, status } = body;
+
+        // Check if email already exists
+        const existingUser = await findUserByEmailAsync(email);
+        if (existingUser) {
+          return res.json({ success: false, message: "Email already registered" });
+        }
+
+        const id = uid("user");
+        const hashedPassword = await bcryptjs.hash(password, 10);
+        const userStatus = status || "regular";
+
+        const newUser = await createUser({
+          id,
+          email,
+          name,
+          password_hash: hashedPassword,
+          is_admin: userStatus === "admin",
+          status: userStatus,
+          is_banned: false,
+          created_at: new Date().toISOString(),
+        });
+
+        if (!newUser) {
+          return res.status(500).json({ success: false, message: "Failed to create user" });
+        }
+
+        res.json({
+          success: true,
+          message: `User ${name} created successfully with status: ${userStatus}`,
+          user: convertDbUserToApi(newUser),
+        });
+      } catch (error) {
+        console.error("[Users] Create error:", error);
+        res.status(500).json({ success: false, message: "Failed to create user" });
       }
     }
   );

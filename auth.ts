@@ -85,3 +85,10 @@ export interface UserActionRequest {
   reason?: string; // for kick reason
   newStatus?: "admin" | "test" | "regular"; // for change-status action
 }
+
+export interface AdminCreateUserRequest {
+  email: string;
+  name: string;
+  password: string;
+  status?: "admin" | "test" | "regular";
+}
