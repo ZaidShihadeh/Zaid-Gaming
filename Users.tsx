@@ -53,6 +53,11 @@ export default function Users() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [tempBanDuration, setTempBanDuration] = useState<string>("24");
   const [kickReason, setKickReason] = useState<string>("");
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
+  const [newUserEmail, setNewUserEmail] = useState<string>("");
+  const [newUserName, setNewUserName] = useState<string>("");
+  const [newUserPassword, setNewUserPassword] = useState<string>("");
+  const [newUserStatus, setNewUserStatus] = useState<"admin" | "test" | "regular">("regular");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -154,6 +159,65 @@ export default function Users() {
     }
   };
 
+  const handleCreateUser = async () => {
+    if (!newUserEmail || !newUserName || !newUserPassword) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsCreatingUser(true);
+
+    try {
+      const response = await fetch("/api/users/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          email: newUserEmail,
+          name: newUserName,
+          password: newUserPassword,
+          status: newUserStatus,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast({
+          title: "Success!",
+          description: data.message,
+        });
+        // Reset form
+        setNewUserEmail("");
+        setNewUserName("");
+        setNewUserPassword("");
+        setNewUserStatus("regular");
+        // Refresh users list
+        fetchUsers();
+      } else {
+        toast({
+          title: "Error",
+          description: data.message,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create user.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreatingUser(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gaming-dark flex items-center justify-center">
@@ -194,14 +258,91 @@ export default function Users() {
 
       <div className="relative z-10 container mx-auto px-4 py-8">
         <Card className="bg-gaming-card/80 border-gaming-border">
-          <CardHeader>
-            <CardTitle className="flex items-center text-neon-purple">
-              <UsersIcon className="mr-2 h-6 w-6" />
-              User Management
-            </CardTitle>
-            <CardDescription>
-              Manage all registered users and their access permissions
-            </CardDescription>
+          <CardHeader className="flex flex-row items-start justify-between">
+            <div className="flex-1">
+              <CardTitle className="flex items-center text-neon-purple">
+                <UsersIcon className="mr-2 h-6 w-6" />
+                User Management
+              </CardTitle>
+              <CardDescription>
+                Manage all registered users and their access permissions
+              </CardDescription>
+            </div>
+            {/* Create User Button */}
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button className="bg-neon-blue hover:bg-neon-blue/80">
+                  + Create User
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-gaming-card border-gaming-border">
+                <DialogHeader>
+                  <DialogTitle className="text-neon-blue">Create New User</DialogTitle>
+                  <DialogDescription>
+                    Create a new user account with their credentials and status level.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="new-user-email">Email</Label>
+                    <Input
+                      id="new-user-email"
+                      type="email"
+                      placeholder="user@example.com"
+                      value={newUserEmail}
+                      onChange={(e) => setNewUserEmail(e.target.value)}
+                      className="bg-gaming-dark/50 border-gaming-border"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="new-user-name">Name</Label>
+                    <Input
+                      id="new-user-name"
+                      type="text"
+                      placeholder="John Doe"
+                      value={newUserName}
+                      onChange={(e) => setNewUserName(e.target.value)}
+                      className="bg-gaming-dark/50 border-gaming-border"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="new-user-password">Password</Label>
+                    <Input
+                      id="new-user-password"
+                      type="password"
+                      placeholder="At least 8 characters"
+                      value={newUserPassword}
+                      onChange={(e) => setNewUserPassword(e.target.value)}
+                      className="bg-gaming-dark/50 border-gaming-border"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="new-user-status">User Status</Label>
+                    <select
+                      id="new-user-status"
+                      value={newUserStatus}
+                      onChange={(e) =>
+                        setNewUserStatus(e.target.value as "admin" | "test" | "regular")
+                      }
+                      className="w-full px-3 py-2 bg-gaming-dark/50 border border-gaming-border rounded text-neon-blue"
+                    >
+                      <option value="regular">Regular</option>
+                      <option value="test">Test</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button
+                    onClick={handleCreateUser}
+                    disabled={isCreatingUser}
+                    className="bg-neon-blue hover:bg-neon-blue/80"
+                  >
+                    {isCreatingUser ? "Creating..." : "Create User"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </CardHeader>
           <CardContent>
             <div className="rounded-md border border-gaming-border">

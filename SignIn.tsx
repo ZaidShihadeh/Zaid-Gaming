@@ -223,16 +223,10 @@ export default function SignIn() {
               </Button>
             </form>
 
-            <div className="text-center text-sm">
+            <div className="text-center text-xs bg-gaming-dark/50 border border-gaming-border/50 rounded p-3">
               <span className="text-muted-foreground">
-                Don't have an account?{" "}
+                Don't have an account? Contact an administrator to create one for you.
               </span>
-              <Link
-                to="/signup"
-                className="text-neon-blue hover:text-neon-purple transition-colors"
-              >
-                Sign up
-              </Link>
             </div>
           </CardContent>
         </Card>

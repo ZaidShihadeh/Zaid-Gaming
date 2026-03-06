@@ -55,14 +55,15 @@ const App = () => {
         <Sonner />
         <UnderConstructionGate>
           <BrowserRouter>
-            <Suspense
-              fallback={
-                <div className="min-h-screen bg-gaming-dark flex items-center justify-center text-neon-blue">
-                  Loading...
-                </div>
-              }
-            >
-              <Routes>
+            <AuthGate>
+              <Suspense
+                fallback={
+                  <div className="min-h-screen bg-gaming-dark flex items-center justify-center text-neon-blue">
+                    Loading...
+                  </div>
+                }
+              >
+                <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/discord" element={<Discord />} />
                 <Route path="/bug-report" element={<BugReport />} />
@@ -87,10 +88,11 @@ const App = () => {
                 <Route path="/game-tracking" element={<GameTracking />} />
                 <Route path="/game-suggestions-admin" element={<GameSuggestionsAdmin />} />
                 <Route path="/test" element={<TestPage />} />
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Suspense>
+                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </Suspense>
+            </AuthGate>
           </BrowserRouter>
         </UnderConstructionGate>
       </TooltipProvider>

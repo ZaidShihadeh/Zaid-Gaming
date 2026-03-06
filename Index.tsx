@@ -149,6 +149,9 @@ export default function Index() {
 
               {isLoggedIn ? (
                 <>
+                  <div className="flex items-center space-x-1 text-sm text-neon-blue">
+                    <span>Welcome, {userData?.name?.split(' ')[0]}</span>
+                  </div>
                   <Link to="/profile">
                     <Button
                       size="sm"
@@ -258,6 +261,9 @@ export default function Index() {
               </Link>
               {isLoggedIn ? (
                 <>
+                  <div className="px-4 py-2 text-sm text-neon-blue">
+                    Welcome, {userData?.name?.split(' ')[0]}
+                  </div>
                   <Link to="/profile" onClick={() => setIsMenuOpen(false)}>
                     <Button
                       size="sm"
