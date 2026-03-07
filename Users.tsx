@@ -53,6 +53,11 @@ export default function Users() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [tempBanDuration, setTempBanDuration] = useState<string>("24");
   const [kickReason, setKickReason] = useState<string>("");
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
+  const [newUserEmail, setNewUserEmail] = useState<string>("");
+  const [newUserName, setNewUserName] = useState<string>("");
+  const [newUserPassword, setNewUserPassword] = useState<string>("");
+  const [newUserStatus, setNewUserStatus] = useState<"admin" | "test" | "regular">("regular");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -103,9 +108,10 @@ export default function Users() {
 
   const handleUserAction = async (
     userId: string,
-    action: "ban" | "unban" | "kick" | "tempban",
+    action: "ban" | "unban" | "kick" | "tempban" | "change-status",
     duration?: number,
     reason?: string,
+    newStatus?: "admin" | "test" | "regular",
   ) => {
     setActionLoading(userId);
 
@@ -115,6 +121,7 @@ export default function Users() {
         action,
         duration,
         reason,
+        newStatus,
       };
       const response = await fetch("/api/users/action", {
         method: "POST",
@@ -149,6 +156,65 @@ export default function Users() {
       });
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const handleCreateUser = async () => {
+    if (!newUserEmail || !newUserName || !newUserPassword) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsCreatingUser(true);
+
+    try {
+      const response = await fetch("/api/users/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          email: newUserEmail,
+          name: newUserName,
+          password: newUserPassword,
+          status: newUserStatus,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast({
+          title: "Success!",
+          description: data.message,
+        });
+        // Reset form
+        setNewUserEmail("");
+        setNewUserName("");
+        setNewUserPassword("");
+        setNewUserStatus("regular");
+        // Refresh users list
+        fetchUsers();
+      } else {
+        toast({
+          title: "Error",
+          description: data.message,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create user.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreatingUser(false);
     }
   };
 
@@ -192,14 +258,91 @@ export default function Users() {
 
       <div className="relative z-10 container mx-auto px-4 py-8">
         <Card className="bg-gaming-card/80 border-gaming-border">
-          <CardHeader>
-            <CardTitle className="flex items-center text-neon-purple">
-              <UsersIcon className="mr-2 h-6 w-6" />
-              User Management
-            </CardTitle>
-            <CardDescription>
-              Manage all registered users and their access permissions
-            </CardDescription>
+          <CardHeader className="flex flex-row items-start justify-between">
+            <div className="flex-1">
+              <CardTitle className="flex items-center text-neon-purple">
+                <UsersIcon className="mr-2 h-6 w-6" />
+                User Management
+              </CardTitle>
+              <CardDescription>
+                Manage all registered users and their access permissions
+              </CardDescription>
+            </div>
+            {/* Create User Button */}
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button className="bg-neon-blue hover:bg-neon-blue/80">
+                  + Create User
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-gaming-card border-gaming-border">
+                <DialogHeader>
+                  <DialogTitle className="text-neon-blue">Create New User</DialogTitle>
+                  <DialogDescription>
+                    Create a new user account with their credentials and status level.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="new-user-email">Email</Label>
+                    <Input
+                      id="new-user-email"
+                      type="email"
+                      placeholder="user@example.com"
+                      value={newUserEmail}
+                      onChange={(e) => setNewUserEmail(e.target.value)}
+                      className="bg-gaming-dark/50 border-gaming-border"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="new-user-name">Name</Label>
+                    <Input
+                      id="new-user-name"
+                      type="text"
+                      placeholder="John Doe"
+                      value={newUserName}
+                      onChange={(e) => setNewUserName(e.target.value)}
+                      className="bg-gaming-dark/50 border-gaming-border"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="new-user-password">Password</Label>
+                    <Input
+                      id="new-user-password"
+                      type="password"
+                      placeholder="At least 8 characters"
+                      value={newUserPassword}
+                      onChange={(e) => setNewUserPassword(e.target.value)}
+                      className="bg-gaming-dark/50 border-gaming-border"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="new-user-status">User Status</Label>
+                    <select
+                      id="new-user-status"
+                      value={newUserStatus}
+                      onChange={(e) =>
+                        setNewUserStatus(e.target.value as "admin" | "test" | "regular")
+                      }
+                      className="w-full px-3 py-2 bg-gaming-dark/50 border border-gaming-border rounded text-neon-blue"
+                    >
+                      <option value="regular">Regular</option>
+                      <option value="test">Test</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button
+                    onClick={handleCreateUser}
+                    disabled={isCreatingUser}
+                    className="bg-neon-blue hover:bg-neon-blue/80"
+                  >
+                    {isCreatingUser ? "Creating..." : "Create User"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </CardHeader>
           <CardContent>
             <div className="rounded-md border border-gaming-border">
@@ -208,8 +351,9 @@ export default function Users() {
                   <TableRow className="border-gaming-border hover:bg-gaming-dark/50">
                     <TableHead>User</TableHead>
                     <TableHead>Email</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Role</TableHead>
+                    <TableHead>Ban Status</TableHead>
+                    <TableHead>User Status</TableHead>
+                    <TableHead>Password</TableHead>
                     <TableHead>Joined</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -263,26 +407,108 @@ export default function Users() {
                         )}
                       </TableCell>
                       <TableCell>
-                        {user.isAdmin ? (
+                        {user.status === "admin" ? (
                           <Badge className="bg-neon-purple/20 text-neon-purple border-neon-purple/30">
                             <Shield className="mr-1 h-3 w-3" />
                             Admin
+                          </Badge>
+                        ) : user.status === "test" ? (
+                          <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">
+                            Test
                           </Badge>
                         ) : (
                           <Badge
                             variant="outline"
                             className="text-muted-foreground border-gaming-border"
                           >
-                            User
+                            Regular
                           </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {user.password ? (
+                          <span className="text-yellow-400 text-xs font-mono">
+                            {user.password}
+                          </span>
+                        ) : (
+                          <span className="text-gray-500">—</span>
                         )}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {new Date(user.createdAt).toLocaleDateString()}
                       </TableCell>
                       <TableCell className="text-right">
+                        <div className="flex justify-end space-x-1 flex-wrap gap-2">
+                          {/* Status Change Button */}
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-cyan-400 border-cyan-500/50 hover:bg-cyan-500/10"
+                                title="Change user status"
+                              >
+                                <Shield className="h-4 w-4" />
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="bg-gaming-card border-gaming-border">
+                              <DialogHeader>
+                                <DialogTitle className="text-cyan-400">
+                                  Change User Status
+                                </DialogTitle>
+                                <DialogDescription>
+                                  Change status for{" "}
+                                  <span className="font-medium text-cyan-400">
+                                    {user.name}
+                                  </span>
+                                </DialogDescription>
+                              </DialogHeader>
+                              <div className="py-4 space-y-3">
+                                {(["admin", "test", "regular"] as const).map(
+                                  (statusOption) => (
+                                    <Button
+                                      key={statusOption}
+                                      onClick={() =>
+                                        handleUserAction(
+                                          user.id,
+                                          "change-status",
+                                          undefined,
+                                          undefined,
+                                          statusOption
+                                        )
+                                      }
+                                      variant={
+                                        user.status === statusOption
+                                          ? "default"
+                                          : "outline"
+                                      }
+                                      disabled={
+                                        actionLoading === user.id ||
+                                        user.status === statusOption
+                                      }
+                                      className={
+                                        statusOption === "admin"
+                                          ? "bg-neon-purple/20 text-neon-purple border-neon-purple/30 hover:bg-neon-purple/30 w-full"
+                                          : statusOption === "test"
+                                            ? "bg-blue-500/20 text-blue-400 border-blue-500/30 hover:bg-blue-500/30 w-full"
+                                            : "bg-gray-500/20 text-gray-400 border-gray-500/30 hover:bg-gray-500/30 w-full"
+                                      }
+                                    >
+                                      {statusOption === "admin" && (
+                                        <Shield className="mr-2 h-4 w-4" />
+                                      )}
+                                      {statusOption.charAt(0).toUpperCase() +
+                                        statusOption.slice(1)}{" "}
+                                      {user.status === statusOption && "✓"}
+                                    </Button>
+                                  )
+                                )}
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+
                         {user.id !== currentUser?.id && !user.isAdmin && (
-                          <div className="flex justify-end space-x-1">
+                          <>
                             {user.isBanned ||
                             (user.tempBannedUntil &&
                               new Date(user.tempBannedUntil) > new Date()) ? (
@@ -497,8 +723,9 @@ export default function Users() {
                                 </Dialog>
                               </>
                             )}
-                          </div>
+                          </>
                         )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

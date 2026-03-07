@@ -149,6 +149,9 @@ export default function Index() {
 
               {isLoggedIn ? (
                 <>
+                  <div className="flex items-center space-x-1 text-sm text-neon-blue">
+                    <span>Welcome, {userData?.name?.split(' ')[0]}</span>
+                  </div>
                   <Link to="/profile">
                     <Button
                       size="sm"
@@ -168,6 +171,18 @@ export default function Index() {
                       Notifications
                     </Button>
                   </Link>
+                  {userData?.status === "test" && (
+                    <Link to="/test">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full sm:w-auto bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/50 hover:border-blue-400 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/25"
+                      >
+                        <Gamepad2 className="mr-2 h-4 w-4" />
+                        All Games
+                      </Button>
+                    </Link>
+                  )}
                   <Button
                     size="sm"
                     variant="outline"
@@ -246,6 +261,9 @@ export default function Index() {
               </Link>
               {isLoggedIn ? (
                 <>
+                  <div className="px-4 py-2 text-sm text-neon-blue">
+                    Welcome, {userData?.name?.split(' ')[0]}
+                  </div>
                   <Link to="/profile" onClick={() => setIsMenuOpen(false)}>
                     <Button
                       size="sm"
@@ -265,6 +283,18 @@ export default function Index() {
                       Notifications
                     </Button>
                   </Link>
+                  {userData?.status === "test" && (
+                    <Link to="/test" onClick={() => setIsMenuOpen(false)}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/50 transition-all duration-300"
+                      >
+                        <Gamepad2 className="mr-2 h-4 w-4" />
+                        All Games
+                      </Button>
+                    </Link>
+                  )}
                   <Button
                     size="sm"
                     variant="outline"

@@ -9,6 +9,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { preserveAuthState } from "@/lib/auth-utils";
 import UnderConstructionGate from "@/components/UnderConstructionGate";
+import AuthGate from "@/components/AuthGate";
 // Route-based code splitting
 const Index = lazy(() => import("./Index"));
 const NotFound = lazy(() => import("./NotFound"));
@@ -34,6 +35,7 @@ const GamePage = lazy(() => import("./GamePage"));
 const GameSuggestions = lazy(() => import("./GameSuggestions"));
 const GameTracking = lazy(() => import("./GameTracking"));
 const GameSuggestionsAdmin = lazy(() => import("./GameSuggestionsAdmin"));
+const TestPage = lazy(() => import("./TestPage"));
 
 const queryClient = new QueryClient();
 
@@ -53,14 +55,15 @@ const App = () => {
         <Sonner />
         <UnderConstructionGate>
           <BrowserRouter>
-            <Suspense
-              fallback={
-                <div className="min-h-screen bg-gaming-dark flex items-center justify-center text-neon-blue">
-                  Loading...
-                </div>
-              }
-            >
-              <Routes>
+            <AuthGate>
+              <Suspense
+                fallback={
+                  <div className="min-h-screen bg-gaming-dark flex items-center justify-center text-neon-blue">
+                    Loading...
+                  </div>
+                }
+              >
+                <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/discord" element={<Discord />} />
                 <Route path="/bug-report" element={<BugReport />} />
@@ -84,10 +87,12 @@ const App = () => {
                 <Route path="/game-suggestions" element={<GameSuggestions />} />
                 <Route path="/game-tracking" element={<GameTracking />} />
                 <Route path="/game-suggestions-admin" element={<GameSuggestionsAdmin />} />
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Suspense>
+                <Route path="/test" element={<TestPage />} />
+                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </Suspense>
+            </AuthGate>
           </BrowserRouter>
         </UnderConstructionGate>
       </TooltipProvider>

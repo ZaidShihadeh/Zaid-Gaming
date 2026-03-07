@@ -25,19 +25,40 @@ import type {
 import type { CreateReportRequest } from "../reports";
 import type { CreateGameSuggestionRequest } from "../game-suggestions";
 
-// Simple in-memory stores (ephemeral, dev-only)
-const db = {
-  users: new Map<string, User & { passwordHash?: string }>(),
-  events: new Map<string, EventItem>(),
-  eventRsvps: new Map<string, Set<string>>(), // eventId -> Set<userId>
-  notifications: new Map<string, NotificationItem[]>(), // userId -> notifications
-  media: new Map<string, MediaItem>(),
-  comments: new Map<string, CommentItem[]>(), // mediaId -> comments
-  reports: new Map<string, any>(), // reportId -> report
-  contacts: new Map<string, any[]>(), // userId -> contact messages
-  gameSuggestions: new Map<string, any>(), // suggestionId -> game suggestion
-  pendingMedia: new Set<string>(), // ids of pending media
-};
+// Supabase database client
+import {
+  initializeDatabase,
+  getUserByEmail,
+  getUserById,
+  getAllUsers,
+  createUser,
+  updateUser,
+  deleteUser,
+  getApprovedMedia,
+  getPendingMedia,
+  createMedia,
+  updateMediaStatus,
+  getComments,
+  createComment,
+  getAllEvents,
+  createEvent,
+  getEventRsvp,
+  getEventRsvpCount,
+  toggleEventRsvp,
+  getNotifications,
+  getAllReports,
+  getUserReports,
+  createReport,
+  updateReport,
+  getAllContacts,
+  getUserContacts,
+  createContact,
+  updateContact,
+  getAllGameSuggestions,
+  getUserGameSuggestions,
+  createGameSuggestion,
+  updateGameSuggestion,
+} from "./supabase-db";
 
 // Validation schemas
 const signUpSchema = z.object({
@@ -115,9 +136,17 @@ const updateGameSuggestionSchema = z.object({
 
 const usersActionSchema = z.object({
   userId: z.string(),
-  action: z.enum(["ban", "unban", "kick", "tempban"]),
+  action: z.enum(["ban", "unban", "kick", "tempban", "change-status"]),
   duration: z.number().positive().optional(),
   reason: z.string().max(500).optional(),
+  newStatus: z.enum(["admin", "test", "regular"]).optional(),
+});
+
+const adminCreateUserSchema = z.object({
+  email: z.string().email("Invalid email").max(255),
+  name: z.string().min(1, "Name is required").max(255),
+  password: z.string().min(8, "Password must be at least 8 characters").max(128),
+  status: z.enum(["admin", "test", "regular"]).optional(),
 });
 
 // Validation middleware
@@ -215,11 +244,32 @@ function isAdminByIdentity(
   );
 }
 
-function findUserByEmail(email: string) {
-  email = email.toLowerCase();
-  return Array.from(db.users.values()).find(
-    (u) => u.email?.toLowerCase?.() === email,
-  );
+async function findUserByEmailAsync(email: string) {
+  return await getUserByEmail(email);
+}
+
+// Convert database user format to API format
+function convertDbUserToApi(dbUser: any): User {
+  return {
+    id: dbUser.id,
+    email: dbUser.email,
+    name: dbUser.name,
+    profilePicture: dbUser.profile_picture,
+    bio: dbUser.bio,
+    bannerUrl: dbUser.banner_url,
+    isAdmin: dbUser.is_admin,
+    status: dbUser.status || "regular",
+    isBanned: dbUser.is_banned,
+    tempBannedUntil: dbUser.temp_banned_until,
+    kickedAt: dbUser.kicked_at,
+    discordId: dbUser.discord_id,
+    username: dbUser.username,
+    discriminator: dbUser.discriminator,
+    badges: dbUser.badges || [],
+    discordRoles: dbUser.discord_roles || [],
+    xp: dbUser.xp || 0,
+    createdAt: dbUser.created_at,
+  };
 }
 
 export function createServer() {
@@ -242,22 +292,26 @@ export function createServer() {
     legacyHeaders: false,
   });
 
-  // Seed a deterministic Test Account (non-admin) in demo mode only
-  if (DEMO_MODE) {
-    const existingTest = findUserByEmail(TEST_EMAIL);
-    if (!existingTest) {
-      const id = uid("user");
-      // Use plaintext for demo-only test account
-      db.users.set(id, {
-        id,
-        email: TEST_EMAIL,
-        name: "Test Account",
-        isAdmin: false,
-        isBanned: false,
-        createdAt: new Date().toISOString(),
-      } as any);
+  // Initialize Supabase and seed test account
+  (async () => {
+    await initializeDatabase();
+
+    if (DEMO_MODE) {
+      const existingTest = await findUserByEmailAsync(TEST_EMAIL);
+      if (!existingTest) {
+        const id = uid("user");
+        await createUser({
+          id,
+          email: TEST_EMAIL,
+          name: "Test Account",
+          is_admin: false,
+          status: "test",
+          is_banned: false,
+          created_at: new Date().toISOString(),
+        });
+      }
     }
-  }
+  })();
 
   // Middleware
   app.use(cors({
@@ -313,59 +367,23 @@ export function createServer() {
   );
 
   // Auth
-  app.get("/api/auth/status", authMiddleware, (req, res) => {
+  app.get("/api/auth/status", authMiddleware, async (req, res) => {
     const userId = (req as any).userId as string;
-    const user = db.users.get(userId);
+    const user = await getUserById(userId);
     if (!user)
       return res.status(401).json({ success: false, message: "Unauthorized" });
-    // Don't return password hash to client
-    const userResponse = { ...user };
-    delete (userResponse as any).passwordHash;
+    // Convert snake_case to camelCase for response
+    const userResponse = convertDbUserToApi(user);
     res.json({ success: true, user: userResponse });
   });
 
-  app.post(
-    "/api/auth/signup",
-    signupLimiter,
-    validateRequest(signUpSchema),
-    async (req, res) => {
-      const body = req.body as SignUpRequest;
-
-      if (findUserByEmail(body.email))
-      return res.json({ success: false, message: "Email already registered" });
-
-    try {
-      const id = uid("user");
-      const hashedPassword = await bcryptjs.hash(body.password, 10);
-      const user: User & { passwordHash?: string } = {
-        id,
-        email: body.email,
-        name: body.name,
-        isAdmin: isAdminByIdentity({ email: body.email }) || false,
-        isBanned: false,
-        createdAt: new Date().toISOString(),
-        profilePicture: undefined,
-        passwordHash: hashedPassword,
-      };
-      db.users.set(id, user);
-      const token = issueToken(id);
-      // Set httpOnly cookie for secure token storage
-      res.cookie("auth_token", token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
-        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-        path: "/",
-      });
-      // Don't return password hash to client
-      const userResponse = { ...user };
-      delete (userResponse as any).passwordHash;
-      res.json({ success: true, user: userResponse });
-    } catch (error) {
-      res.status(500).json({ success: false, message: "Signup failed" });
-    }
-  }
-  );
+  // Signup endpoint disabled - only admins can create users
+  app.post("/api/auth/signup", (_req, res) => {
+    res.status(403).json({
+      success: false,
+      message: "Sign up is disabled. Ask an administrator to create an account for you.",
+    });
+  });
 
   app.post(
     "/api/auth/signin",
@@ -374,7 +392,7 @@ export function createServer() {
     async (req, res) => {
       const body = req.body as SignInRequest;
       try {
-        let user = findUserByEmail(body.email);
+        let user = await findUserByEmailAsync(body.email);
 
         // Handle demo mode test account
         if (
@@ -388,32 +406,31 @@ export function createServer() {
           }
           if (!user) {
             const id = uid("user");
-            const newUser = {
+            user = await createUser({
               id,
               email: TEST_EMAIL,
               name: "Test Account",
-              isAdmin: false,
-              isBanned: false,
-              createdAt: new Date().toISOString(),
-            } as User & { passwordHash?: string };
-            db.users.set(id, newUser);
-            user = newUser;
+              is_admin: false,
+              status: "test",
+              is_banned: false,
+              created_at: new Date().toISOString(),
+            });
           }
         } else if (!user && DEMO_MODE) {
           // In demo mode, auto-register new users
           const id = uid("user");
           const hashedPassword = await bcryptjs.hash(body.password, 10);
-          const newUser = {
+          const isAdmin = isAdminByIdentity({ email: body.email }) || false;
+          user = await createUser({
             id,
             email: body.email,
             name: body.email.split("@")[0],
-            isAdmin: isAdminByIdentity({ email: body.email }) || false,
-            isBanned: false,
-            createdAt: new Date().toISOString(),
-            passwordHash: hashedPassword,
-          } as User & { passwordHash?: string };
-          db.users.set(id, newUser);
-          user = newUser;
+            is_admin: isAdmin,
+            status: isAdmin ? "admin" : "regular",
+            is_banned: false,
+            password_hash: hashedPassword,
+            created_at: new Date().toISOString(),
+          });
         } else if (!user) {
           // Production: user doesn't exist, fail immediately
           return res
@@ -421,9 +438,8 @@ export function createServer() {
             .json({ success: false, message: "Invalid credentials" });
         } else {
           // User exists: verify password hash
-          const passwordHash = (user as any).passwordHash;
+          const passwordHash = (user as any).password_hash;
           if (!passwordHash) {
-            // User has no password hash (legacy account), reject
             return res
               .status(401)
               .json({ success: false, message: "Invalid credentials" });
@@ -438,7 +454,9 @@ export function createServer() {
               .json({ success: false, message: "Invalid credentials" });
           }
           // Update admin flag if identity matches
-          if (isAdminByIdentity(user)) (user as any).isAdmin = true;
+          if (isAdminByIdentity(user)) {
+            user = await updateUser(user.id, { is_admin: true });
+          }
         }
 
         // At this point, user should be defined (or we've returned)
@@ -448,7 +466,7 @@ export function createServer() {
             .json({ success: false, message: "Sign in failed" });
         }
 
-        if (user.isBanned) {
+        if (user.is_banned) {
           return res.json({
             success: false,
             message: "User is banned",
@@ -457,92 +475,107 @@ export function createServer() {
         }
 
         const token = issueToken(user.id);
-        // Set httpOnly cookie for secure token storage
         res.cookie("auth_token", token, {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
           sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
-          maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+          maxAge: 30 * 24 * 60 * 60 * 1000,
           path: "/",
         });
-        // Don't return password hash to client
-        const userResponse = { ...user };
-        delete (userResponse as any).passwordHash;
-        res.json({ success: true, user: userResponse });
+
+        res.json({ success: true, user: convertDbUserToApi(user) });
       } catch (error) {
+        console.error("[Auth] Signin error:", error);
         res.status(500).json({ success: false, message: "Sign in failed" });
       }
     }
   );
 
-  app.post("/api/auth/discord-sync", (req, res) => {
-    const { id, email, name, profilePicture, discordId, username } =
-      req.body || {};
-    const userId = typeof id === "string" ? id : uid("user");
-    let user = db.users.get(userId);
-    if (!user) {
-      const newUser = {
-        id: userId,
-        email: email || `${username || name || "user"}@example.com`,
-        name: name || username || "User",
-        profilePicture,
-        isAdmin: isAdminByIdentity({ email, username }),
-        isBanned: false,
-        createdAt: new Date().toISOString(),
-        discordId,
-        username,
-      } as User & { passwordHash?: string };
-      db.users.set(userId, newUser);
-      user = newUser;
-    } else {
-      user.email = email || user.email;
-      user.name = name || user.name;
-      user.profilePicture = profilePicture || user.profilePicture;
-      (user as any).discordId = discordId || (user as any).discordId;
-      (user as any).username = username || (user as any).username;
-      if (
-        isAdminByIdentity({
-          email: user.email,
-          username: (user as any).username,
-        })
-      ) {
-        (user as any).isAdmin = true;
+  app.post("/api/auth/discord-sync", async (req, res) => {
+    try {
+      const { id, email, name, profilePicture, discordId, username } =
+        req.body || {};
+      const userId = typeof id === "string" ? id : uid("user");
+      let user = await getUserById(userId);
+
+      if (!user) {
+        const isAdmin = isAdminByIdentity({ email, username });
+        user = await createUser({
+          id: userId,
+          email: email || `${username || name || "user"}@example.com`,
+          name: name || username || "User",
+          profile_picture: profilePicture,
+          is_admin: isAdmin,
+          status: isAdmin ? "admin" : "regular",
+          is_banned: false,
+          discord_id: discordId,
+          username,
+          created_at: new Date().toISOString(),
+        });
+      } else {
+        const updates: any = {};
+        if (email) updates.email = email;
+        if (name) updates.name = name;
+        if (profilePicture) updates.profile_picture = profilePicture;
+        if (discordId) updates.discord_id = discordId;
+        if (username) updates.username = username;
+
+        if (isAdminByIdentity({ email: user.email, username: user.username })) {
+          updates.is_admin = true;
+        }
+
+        if (Object.keys(updates).length > 0) {
+          user = await updateUser(userId, updates);
+        }
       }
+
+      if (!user) {
+        return res.status(500).json({ success: false, message: "Failed to sync user" });
+      }
+
+      const token = issueToken(userId);
+      res.cookie("auth_token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+        path: "/",
+      });
+
+      res.json({ success: true, user: convertDbUserToApi(user) });
+    } catch (error) {
+      console.error("[Auth] Discord sync error:", error);
+      res.status(500).json({ success: false, message: "Discord sync failed" });
     }
-    const token = issueToken(userId);
-    // Set httpOnly cookie for secure token storage
-    res.cookie("auth_token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-      path: "/",
-    });
-    // Don't return password hash to client
-    const userResponse = { ...user };
-    delete (userResponse as any).passwordHash;
-    res.json({ success: true, user: userResponse });
   });
 
-  app.put("/api/auth/update-profile", authMiddleware, (req, res) => {
-    const userId = (req as any).userId as string;
-    const body = req.body as UpdateProfileRequest;
-    const user = db.users.get(userId);
-    if (!user)
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
-    if (typeof body.name === "string") user.name = body.name;
-    if (typeof body.profilePicture === "string")
-      user.profilePicture = body.profilePicture;
-    if (typeof (body as any).bio === "string")
-      (user as any).bio = (body as any).bio;
-    if (typeof (body as any).bannerUrl === "string")
-      (user as any).bannerUrl = (body as any).bannerUrl;
-    // Don't return password hash to client
-    const userResponse = { ...user };
-    delete (userResponse as any).passwordHash;
-    res.json({ success: true, user: userResponse });
+  app.put("/api/auth/update-profile", authMiddleware, async (req, res) => {
+    try {
+      const userId = (req as any).userId as string;
+      const body = req.body as UpdateProfileRequest;
+      const user = await getUserById(userId);
+
+      if (!user)
+        return res
+          .status(404)
+          .json({ success: false, message: "User not found" });
+
+      const updates: any = {};
+      if (typeof body.name === "string") updates.name = body.name;
+      if (typeof body.profilePicture === "string") updates.profile_picture = body.profilePicture;
+      if (typeof (body as any).bio === "string") updates.bio = (body as any).bio;
+      if (typeof (body as any).bannerUrl === "string") updates.banner_url = (body as any).bannerUrl;
+
+      const updatedUser = await updateUser(userId, updates);
+      if (!updatedUser) {
+        return res.status(500).json({ success: false, message: "Failed to update profile" });
+      }
+
+      res.json({ success: true, user: convertDbUserToApi(updatedUser) });
+    } catch (error) {
+      console.error("[Auth] Update profile error:", error);
+      res.status(500).json({ success: false, message: "Failed to update profile" });
+    }
   });
 
   app.post("/api/auth/start-email-change", authMiddleware, (req, res) => {
@@ -944,18 +977,26 @@ export function createServer() {
   );
 
   // Users management
-  app.get("/api/users", authMiddleware, adminMiddleware, (_req, res) => {
-    const users = Array.from(db.users.values()).map((u) => ({
-      id: u.id,
-      email: u.email,
-      name: u.name,
-      profilePicture: u.profilePicture,
-      isAdmin: u.isAdmin,
-      isBanned: u.isBanned,
-      tempBannedUntil: (u as any).tempBannedUntil,
-      createdAt: u.createdAt,
-    }));
-    res.json({ success: true, users });
+  app.get("/api/users", authMiddleware, adminMiddleware, async (_req, res) => {
+    try {
+      const dbUsers = await getAllUsers();
+      const users = dbUsers.map((u: any) => ({
+        id: u.id,
+        email: u.email,
+        name: u.name,
+        profilePicture: u.profile_picture,
+        isAdmin: u.is_admin,
+        status: u.status || "regular",
+        isBanned: u.is_banned,
+        tempBannedUntil: u.temp_banned_until,
+        createdAt: u.created_at,
+        password: u.password_hash ? "[HASHED]" : undefined,
+      }));
+      res.json({ success: true, users });
+    } catch (error) {
+      console.error("[Users] List error:", error);
+      res.status(500).json({ success: false, message: "Failed to fetch users" });
+    }
   });
 
   app.post(
@@ -963,60 +1004,101 @@ export function createServer() {
     authMiddleware,
     adminMiddleware,
     validateRequest(usersActionSchema),
-    (req, res) => {
-      const body = req.body as any;
-      const { userId, action, duration, reason } = body;
+    async (req, res) => {
+      try {
+        const body = req.body as any;
+        const { userId, action, duration, reason, newStatus } = body;
 
-      const user = db.users.get(userId);
-      if (!user) {
-        return res
-          .status(404)
-          .json({ success: false, message: "User not found" });
+        const user = await getUserById(userId);
+        if (!user) {
+          return res
+            .status(404)
+            .json({ success: false, message: "User not found" });
+        }
+
+        if (action === "ban") {
+          await updateUser(userId, { is_banned: true, temp_banned_until: null });
+          res.json({ success: true, message: "User banned successfully" });
+        } else if (action === "unban") {
+          await updateUser(userId, { is_banned: false, temp_banned_until: null });
+          res.json({ success: true, message: "User unbanned successfully" });
+        } else if (action === "kick") {
+          // Delete user (cascade delete handled by database foreign key constraints)
+          await deleteUser(userId);
+          res.json({ success: true, message: "User kicked successfully" });
+        } else if (action === "tempban") {
+          if (!duration || duration <= 0) {
+            return res.status(400).json({
+              success: false,
+              message: "Valid duration (hours) required for tempban",
+            });
+          }
+          const until = new Date(Date.now() + duration * 60 * 60 * 1000);
+          await updateUser(userId, { temp_banned_until: until.toISOString() });
+          res.json({ success: true, message: "User temporarily banned" });
+        } else if (action === "change-status") {
+          if (!newStatus || !["admin", "test", "regular"].includes(newStatus)) {
+            return res.status(400).json({
+              success: false,
+              message: "Valid status required (admin, test, regular)",
+            });
+          }
+          await updateUser(userId, { status: newStatus });
+          res.json({ success: true, message: `User status changed to ${newStatus}` });
+        } else {
+          res.status(400).json({ success: false, message: "Invalid action" });
+        }
+      } catch (error) {
+        console.error("[Users] Action error:", error);
+        res.status(500).json({ success: false, message: "Failed to perform action" });
       }
+    }
+  );
 
-      if (action === "ban") {
-        user.isBanned = true;
-        res.json({ success: true, message: "User banned successfully" });
-      } else if (action === "unban") {
-        user.isBanned = false;
-        (user as any).tempBannedUntil = undefined;
-        res.json({ success: true, message: "User unbanned successfully" });
-      } else if (action === "kick") {
-        // Cascade delete: clean up user's data
-        db.users.delete(userId);
-        db.notifications.delete(userId);
-        db.contacts.delete(userId);
-        db.eventRsvps.forEach((set) => set.delete(userId));
+  // Admin: Create a new user
+  app.post(
+    "/api/users/create",
+    authMiddleware,
+    adminMiddleware,
+    validateRequest(adminCreateUserSchema),
+    async (req, res) => {
+      try {
+        const body = req.body as any;
+        const { email, name, password, status } = body;
 
-        // Remove user's media and comments
-        for (const [mediaId, comments] of db.comments.entries()) {
-          db.comments.set(
-            mediaId,
-            comments.filter((c) => c.userId !== userId),
-          );
-        }
-        for (const [id, media] of db.media.entries()) {
-          if (media.userId === userId) db.media.delete(id);
+        // Check if email already exists
+        const existingUser = await findUserByEmailAsync(email);
+        if (existingUser) {
+          return res.json({ success: false, message: "Email already registered" });
         }
 
-        // Remove user's reports and their associated contact messages
-        for (const [id, report] of db.reports.entries()) {
-          if (report.userId === userId) db.reports.delete(id);
+        const id = uid("user");
+        const hashedPassword = await bcryptjs.hash(password, 10);
+        const userStatus = status || "regular";
+
+        const newUser = await createUser({
+          id,
+          email,
+          name,
+          password_hash: hashedPassword,
+          is_admin: userStatus === "admin",
+          status: userStatus,
+          is_banned: false,
+          created_at: new Date().toISOString(),
+        });
+
+        if (!newUser) {
+          return res.status(500).json({ success: false, message: "Failed to create user" });
         }
 
-        res.json({ success: true, message: "User kicked successfully" });
-      } else if (action === "tempban") {
-        if (!duration || duration <= 0) {
-          return res.status(400).json({
-            success: false,
-            message: "Valid duration (hours) required for tempban",
-          });
-        }
-        const until = new Date(Date.now() + duration * 60 * 60 * 1000);
-        (user as any).tempBannedUntil = until.toISOString();
-        res.json({ success: true, message: "User temporarily banned" });
-      } else {
-        res.status(400).json({ success: false, message: "Invalid action" });
+        res.json({
+          success: true,
+          message: `User ${name} created successfully with status: ${userStatus}`,
+          user: convertDbUserToApi(newUser),
+        });
+      } catch (error) {
+        console.error("[Users] Create error:", error);
+        res.status(500).json({ success: false, message: "Failed to create user" });
       }
     }
   );

@@ -10,8 +10,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Mail, Lock, LogIn } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Mail, Lock, LogIn } from "lucide-react";
 import { toast } from "sonner";
 import { SignInRequest, AuthResponse } from "@shared/auth";
 import { setAuthData } from "@/lib/auth-utils";
@@ -81,16 +81,6 @@ export default function SignIn() {
       ></div>
 
       <div className="relative z-10 w-full max-w-md">
-        <div className="mb-8 text-center">
-          <Link
-            to="/"
-            className="inline-flex items-center text-neon-blue hover:text-neon-purple transition-colors"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Home
-          </Link>
-        </div>
-
         <Card className="bg-gaming-card/80 border-gaming-border backdrop-blur-md">
           <CardHeader className="text-center">
             <div className="mx-auto mb-4">
@@ -223,16 +213,10 @@ export default function SignIn() {
               </Button>
             </form>
 
-            <div className="text-center text-sm">
+            <div className="text-center text-xs bg-gaming-dark/50 border border-gaming-border/50 rounded p-3">
               <span className="text-muted-foreground">
-                Don't have an account?{" "}
+                Don't have an account? Contact an administrator to create one for you.
               </span>
-              <Link
-                to="/signup"
-                className="text-neon-blue hover:text-neon-purple transition-colors"
-              >
-                Sign up
-              </Link>
             </div>
           </CardContent>
         </Card>
