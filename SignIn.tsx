@@ -10,8 +10,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Mail, Lock, LogIn } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Mail, Lock, LogIn } from "lucide-react";
 import { toast } from "sonner";
 import { SignInRequest, AuthResponse } from "@shared/auth";
 import { setAuthData } from "@/lib/auth-utils";
@@ -81,16 +81,6 @@ export default function SignIn() {
       ></div>
 
       <div className="relative z-10 w-full max-w-md">
-        <div className="mb-8 text-center">
-          <Link
-            to="/"
-            className="inline-flex items-center text-neon-blue hover:text-neon-purple transition-colors"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Home
-          </Link>
-        </div>
-
         <Card className="bg-gaming-card/80 border-gaming-border backdrop-blur-md">
           <CardHeader className="text-center">
             <div className="mx-auto mb-4">
