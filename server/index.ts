@@ -210,30 +210,38 @@ function authMiddleware(req: Request, res: Response, next: NextFunction) {
   }
 
   const payload = parseToken(token);
-  if (!payload)
+  if (!payload) {
+    console.log("[Auth] No valid token found for request to", req.path);
     return res.status(401).json({ success: false, message: "Unauthorized" });
+  }
   (req as any).userId = payload.userId;
+  console.log("[Auth] User authenticated:", payload.userId);
   next();
 }
 
-function adminMiddleware(req: Request, res: Response, next: NextFunction) {
-  const userId = (req as any).userId as string | undefined;
-  if (!userId)
-    return res.status(401).json({ success: false, message: "Unauthorized" });
-
-  // Check admin status asynchronously
-  (async () => {
-    try {
-      const user = await getUserById(userId);
-      if (!user?.is_admin) {
-        return res.status(403).json({ success: false, message: "Forbidden" });
-      }
-      next();
-    } catch (error) {
-      console.error("[Auth] Admin check error:", error);
-      res.status(500).json({ success: false, message: "Internal server error" });
+async function adminMiddleware(req: Request, res: Response, next: NextFunction) {
+  try {
+    const userId = (req as any).userId as string | undefined;
+    if (!userId) {
+      console.log("[Auth] No userId in request for admin check");
+      return res.status(401).json({ success: false, message: "Unauthorized" });
     }
-  })();
+
+    console.log("[Auth] Checking admin status for user:", userId);
+    const user = await getUserById(userId);
+    console.log("[Auth] User found:", user?.id, "is_admin:", user?.is_admin);
+
+    if (!user?.is_admin) {
+      console.log("[Auth] User is not admin, denying access");
+      return res.status(403).json({ success: false, message: "Forbidden" });
+    }
+
+    console.log("[Auth] Admin check passed for user:", userId);
+    next();
+  } catch (error) {
+    console.error("[Auth] Admin check error:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
 }
 
 const ADMIN_EMAIL = "zshihadeh671@gmail.com";
@@ -414,7 +422,9 @@ export function createServer() {
     async (req, res) => {
       const body = req.body as SignInRequest;
       try {
+        console.log("[Auth] Sign in attempt for:", body.email);
         let user = await findUserByEmailAsync(body.email);
+        console.log("[Auth] User found:", user ? user.id : "not found");
 
         // Handle demo mode test account
         if (
