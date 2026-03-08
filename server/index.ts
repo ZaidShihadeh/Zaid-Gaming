@@ -210,20 +210,38 @@ function authMiddleware(req: Request, res: Response, next: NextFunction) {
   }
 
   const payload = parseToken(token);
-  if (!payload)
+  if (!payload) {
+    console.log("[Auth] No valid token found for request to", req.path);
     return res.status(401).json({ success: false, message: "Unauthorized" });
+  }
   (req as any).userId = payload.userId;
+  console.log("[Auth] User authenticated:", payload.userId);
   next();
 }
 
-function adminMiddleware(req: Request, res: Response, next: NextFunction) {
-  const userId = (req as any).userId as string | undefined;
-  if (!userId)
-    return res.status(401).json({ success: false, message: "Unauthorized" });
-  const user = db.users.get(userId);
-  if (!user?.isAdmin)
-    return res.status(403).json({ success: false, message: "Forbidden" });
-  next();
+async function adminMiddleware(req: Request, res: Response, next: NextFunction) {
+  try {
+    const userId = (req as any).userId as string | undefined;
+    if (!userId) {
+      console.log("[Auth] No userId in request for admin check");
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    console.log("[Auth] Checking admin status for user:", userId);
+    const user = await getUserById(userId);
+    console.log("[Auth] User found:", user?.id, "is_admin:", user?.is_admin);
+
+    if (!user?.is_admin) {
+      console.log("[Auth] User is not admin, denying access");
+      return res.status(403).json({ success: false, message: "Forbidden" });
+    }
+
+    console.log("[Auth] Admin check passed for user:", userId);
+    next();
+  } catch (error) {
+    console.error("[Auth] Admin check error:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
 }
 
 const ADMIN_EMAIL = "zshihadeh671@gmail.com";
@@ -233,6 +251,18 @@ const ADMIN_DISCORD_USERNAME = "zaidshihadehgaming";
 const DEMO_MODE = (process.env.DEMO_MODE || "false").toLowerCase() === "true";
 const TEST_EMAIL = process.env.TEST_EMAIL || "test123@gmail.com";
 const TEST_PASSWORD = process.env.TEST_PASSWORD || "Test123";
+
+// In-memory database for non-Supabase data (events, notifications, reports, etc.)
+const db = {
+  events: new Map(),
+  eventRsvps: new Map(),
+  notifications: new Map(),
+  media: new Map(),
+  comments: new Map(),
+  reports: new Map(),
+  gameSuggestions: new Map(),
+  contacts: new Map(),
+};
 
 function isAdminByIdentity(
   u: Partial<User> & { email?: string; username?: string },
@@ -392,7 +422,9 @@ export function createServer() {
     async (req, res) => {
       const body = req.body as SignInRequest;
       try {
+        console.log("[Auth] Sign in attempt for:", body.email);
         let user = await findUserByEmailAsync(body.email);
+        console.log("[Auth] User found:", user ? user.id : "not found");
 
         // Handle demo mode test account
         if (
