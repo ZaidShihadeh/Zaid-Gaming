@@ -351,10 +351,6 @@ export function createServer() {
       if (!origin || origin === "http://localhost:5173" || origin === "http://localhost:3000") {
         return callback(null, true);
       }
-      // Allow Builder.my domains
-      if (origin && origin.includes(".projects.builder.my")) {
-        return callback(null, true);
-      }
       // Allow configured FRONTEND_URL
       if (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL) {
         return callback(null, true);

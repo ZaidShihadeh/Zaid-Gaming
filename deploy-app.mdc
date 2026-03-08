@@ -5,7 +5,7 @@ alwaysApply: true
 ---
 Deploying the app to production is powered by Netlify, however, it's only possible as long as there are several tools from netlify available:
 
-- if the tools are not available, tell the user to connect the netlify MCP in: https://builder.io/app/mcp-servers
+- if the tools are not available, inform the user that the netlify MCP is required
 
 If the user asks to deploy the app, use the appropiete netlify MCP tools to deploy the app.
 
