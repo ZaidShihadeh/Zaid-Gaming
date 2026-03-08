@@ -81,6 +81,7 @@ export default function AuthCallback() {
           // Sync with backend
           const syncResponse = await fetch("/api/auth/discord-sync", {
             method: "POST",
+            credentials: "include",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               id: user.id,
