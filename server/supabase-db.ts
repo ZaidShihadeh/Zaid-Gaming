@@ -13,8 +13,8 @@ export const supabase = createClient(supabaseUrl, supabaseServiceKey);
 export async function initializeDatabase() {
   try {
     // Check if users table exists by attempting to query it
-    const { error } = await supabase.from("users").select("count()", { count: "exact" });
-    
+    const { error } = await supabase.from("users").select("id", { count: "exact", head: true });
+
     if (error && error.code === "PGRST116") {
       console.log("[DB] Tables not found, creating schema...");
       // Tables need to be created via SQL in Supabase console

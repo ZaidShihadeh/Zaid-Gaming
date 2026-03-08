@@ -15,8 +15,6 @@ import { Mail, Lock, LogIn } from "lucide-react";
 import { toast } from "sonner";
 import { SignInRequest, AuthResponse } from "@shared/auth";
 import { setAuthData } from "@/lib/auth-utils";
-import { signInWithDiscord } from "@/lib/supabase";
-import { DiscordIcon } from "@/components/DiscordIcon";
 import { apiPost, ApiError } from "@/lib/api-client";
 
 export default function SignIn() {
@@ -26,18 +24,6 @@ export default function SignIn() {
   const [isLoading, setIsLoading] = useState(false);
   const [kickReason, setKickReason] = useState<string | null>(null);
   const navigate = useNavigate();
-
-  const handleDiscordSignIn = async () => {
-    try {
-      await signInWithDiscord();
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to sign in with Discord. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -128,27 +114,6 @@ export default function SignIn() {
                 </div>
               </div>
             )}
-
-            {/* Discord OAuth */}
-            <Button
-              onClick={handleDiscordSignIn}
-              variant="outline"
-              className="w-full bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 border-indigo-500/50"
-            >
-              <DiscordIcon className="mr-2 h-4 w-4" />
-              Continue with Discord
-            </Button>
-
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gaming-border"></div>
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-gaming-card px-2 text-muted-foreground">
-                  Or continue with email
-                </span>
-              </div>
-            </div>
 
             {/* Email Form */}
             <form onSubmit={handleEmailSignIn} className="space-y-4">

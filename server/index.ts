@@ -220,10 +220,20 @@ function adminMiddleware(req: Request, res: Response, next: NextFunction) {
   const userId = (req as any).userId as string | undefined;
   if (!userId)
     return res.status(401).json({ success: false, message: "Unauthorized" });
-  const user = db.users.get(userId);
-  if (!user?.isAdmin)
-    return res.status(403).json({ success: false, message: "Forbidden" });
-  next();
+
+  // Check admin status asynchronously
+  (async () => {
+    try {
+      const user = await getUserById(userId);
+      if (!user?.is_admin) {
+        return res.status(403).json({ success: false, message: "Forbidden" });
+      }
+      next();
+    } catch (error) {
+      console.error("[Auth] Admin check error:", error);
+      res.status(500).json({ success: false, message: "Internal server error" });
+    }
+  })();
 }
 
 const ADMIN_EMAIL = "zshihadeh671@gmail.com";
@@ -233,6 +243,18 @@ const ADMIN_DISCORD_USERNAME = "zaidshihadehgaming";
 const DEMO_MODE = (process.env.DEMO_MODE || "false").toLowerCase() === "true";
 const TEST_EMAIL = process.env.TEST_EMAIL || "test123@gmail.com";
 const TEST_PASSWORD = process.env.TEST_PASSWORD || "Test123";
+
+// In-memory database for non-Supabase data (events, notifications, reports, etc.)
+const db = {
+  events: new Map(),
+  eventRsvps: new Map(),
+  notifications: new Map(),
+  media: new Map(),
+  comments: new Map(),
+  reports: new Map(),
+  gameSuggestions: new Map(),
+  contacts: new Map(),
+};
 
 function isAdminByIdentity(
   u: Partial<User> & { email?: string; username?: string },
