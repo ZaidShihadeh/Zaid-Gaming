@@ -346,7 +346,21 @@ export function createServer() {
   // Middleware
   app.use(cors({
     credentials: true,
-    origin: process.env.FRONTEND_URL || "http://localhost:5173"
+    origin: (origin, callback) => {
+      // Allow localhost for development
+      if (!origin || origin === "http://localhost:5173" || origin === "http://localhost:3000") {
+        return callback(null, true);
+      }
+      // Allow Builder.my domains
+      if (origin && origin.includes(".projects.builder.my")) {
+        return callback(null, true);
+      }
+      // Allow configured FRONTEND_URL
+      if (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL) {
+        return callback(null, true);
+      }
+      callback(null, true); // Allow all for now during development
+    }
   }));
   app.use(cookieParser());
   app.use(express.json({ limit: "10mb" }));
@@ -509,8 +523,8 @@ export function createServer() {
         const token = issueToken(user.id);
         res.cookie("auth_token", token, {
           httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+          secure: true, // Always secure for httpOnly
+          sameSite: "none", // Required for cross-domain
           maxAge: 30 * 24 * 60 * 60 * 1000,
           path: "/",
         });
@@ -568,8 +582,8 @@ export function createServer() {
       const token = issueToken(userId);
       res.cookie("auth_token", token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+        secure: true, // Always secure for httpOnly
+        sameSite: "none", // Required for cross-domain
         maxAge: 30 * 24 * 60 * 60 * 1000,
         path: "/",
       });
