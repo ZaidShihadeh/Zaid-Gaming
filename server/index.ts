@@ -427,7 +427,6 @@ export function createServer() {
 
   app.post(
     "/api/auth/signin",
-    authLimiter,
     validateRequest(signInSchema),
     async (req, res) => {
       const body = req.body as SignInRequest;
